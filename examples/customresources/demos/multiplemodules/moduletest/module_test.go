@@ -107,10 +107,11 @@ func TestMultipleModules(t *testing.T) {
 		gtestutils.WaitForAssertionWithSleep(t, time.Millisecond*500, 20, func(t testing.TB) {
 			checkTraceContents(t, testViamHome,
 				spanExpectation{
-					service:    "rdk",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.component.gizmo.v1.GizmoService",
-					rpcMethod:  "DoTwo",
+					service:      "rdk",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.component.gizmo.v1.GizmoService",
+					rpcMethod:    "DoTwo",
+					resourceName: "gizmo1",
 				},
 				spanExpectation{
 					service:    "rdk",
@@ -119,10 +120,11 @@ func TestMultipleModules(t *testing.T) {
 					rpcMethod:  "DoTwo",
 				},
 				spanExpectation{
-					service:    "GizmoModule",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.component.gizmo.v1.GizmoService",
-					rpcMethod:  "DoTwo",
+					service:      "GizmoModule",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.component.gizmo.v1.GizmoService",
+					rpcMethod:    "DoTwo",
+					resourceName: "gizmo1",
 				},
 				spanExpectation{
 					service:    "GizmoModule",
@@ -131,16 +133,18 @@ func TestMultipleModules(t *testing.T) {
 					rpcMethod:  "Sum",
 				},
 				spanExpectation{
-					service:    "rdk",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.service.summation.v1.SummationService",
-					rpcMethod:  "Sum",
+					service:      "rdk",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.service.summation.v1.SummationService",
+					rpcMethod:    "Sum",
+					resourceName: "adder",
 				},
 				spanExpectation{
-					service:    "SummationModule",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.service.summation.v1.SummationService",
-					rpcMethod:  "Sum",
+					service:      "SummationModule",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.service.summation.v1.SummationService",
+					rpcMethod:    "Sum",
+					resourceName: "adder",
 				},
 			)
 		})
@@ -213,10 +217,11 @@ func TestWebRTCSpans(t *testing.T) {
 		gtestutils.WaitForAssertionWithSleep(t, time.Millisecond*500, 20, func(t testing.TB) {
 			checkTraceContents(t, testViamHome,
 				spanExpectation{
-					service:    "rdk",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "viam.component.motor.v1.MotorService",
-					rpcMethod:  "IsMoving",
+					service:      "rdk",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "viam.component.motor.v1.MotorService",
+					rpcMethod:    "IsMoving",
+					resourceName: "motor-1",
 				},
 			)
 		})
@@ -277,10 +282,11 @@ func modifyCfg(t *testing.T, cfgIn string, logger logging.Logger) (string, int, 
 }
 
 type spanExpectation struct {
-	service    string
-	rpcService string
-	rpcMethod  string
-	kind       otlpv1.Span_SpanKind
+	service      string
+	rpcService   string
+	rpcMethod    string
+	kind         otlpv1.Span_SpanKind
+	resourceName string // viam.resource.name attribute, if expected
 }
 
 // Check that all the specified services exist in the viam trace file
@@ -332,6 +338,9 @@ func checkTraceContents(t testing.TB, viamHome string, expectations ...spanExpec
 				return false
 			}
 			if exp.rpcService != attrs[string(semconv.RPCServiceKey)] {
+				return false
+			}
+			if exp.resourceName != "" && exp.resourceName != attrs["viam.resource.name"] {
 				return false
 			}
 			return true
