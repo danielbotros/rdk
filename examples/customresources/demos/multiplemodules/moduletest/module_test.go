@@ -159,9 +159,7 @@ func TestMultipleModules(t *testing.T) {
 }
 
 // TestWebRTCSpans verifies that gRPC calls made over WebRTC connections generate
-// spans. This is a regression test for a bug where the otelgrpc stats handler was
-// only wired to the direct gRPC server, not the WebRTC server, so WebRTC calls
-// produced no spans at all.
+// spans.
 func TestWebRTCSpans(t *testing.T) {
 	logger, observer := logging.NewObservedTestLogger(t)
 	testViamHome := t.TempDir()
