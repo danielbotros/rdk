@@ -61,7 +61,7 @@ func TestMultipleModules(t *testing.T) {
 	}
 	test.That(t, success, test.ShouldBeTrue)
 
-	rc, err := connectWithDirectGRPC(port, logger)
+	rc, err := connect(port, logger, rpc.WithForceDirectGRPC())
 	test.That(t, err, test.ShouldBeNil)
 	defer func() {
 		test.That(t, rc.Close(context.Background()), test.ShouldBeNil)
@@ -198,7 +198,7 @@ func TestWebRTCSpans(t *testing.T) {
 	}
 	test.That(t, success, test.ShouldBeTrue)
 
-	rc, err := connect(port, logger)
+	rc, err := connect(port, logger, rpc.WithDisableDirectGRPC())
 	test.That(t, err, test.ShouldBeNil)
 	defer func() {
 		test.That(t, rc.Close(context.Background()), test.ShouldBeNil)
@@ -223,15 +223,7 @@ func TestWebRTCSpans(t *testing.T) {
 	})
 }
 
-func connect(port int, logger logging.Logger) (robot.Robot, error) {
-	return connectWithDialOpts(port, logger, rpc.WithDisableDirectGRPC())
-}
-
-func connectWithDirectGRPC(port int, logger logging.Logger) (robot.Robot, error) {
-	return connectWithDialOpts(port, logger, rpc.WithForceDirectGRPC())
-}
-
-func connectWithDialOpts(port int, logger logging.Logger, dialOpts ...rpc.DialOption) (robot.Robot, error) {
+func connect(port int, logger logging.Logger, dialOpts ...rpc.DialOption) (robot.Robot, error) {
 	connectCtx, cancelConn := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancelConn()
 	for {
