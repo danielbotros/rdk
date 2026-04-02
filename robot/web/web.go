@@ -625,6 +625,8 @@ func (svc *webService) initRPCOptions(listenerTCPAddr *net.TCPAddr, options webo
 	unaryInterceptors = append(unaryInterceptors, svc.requestCounter.UnaryInterceptor)
 	streamInterceptors = append(streamInterceptors, svc.requestCounter.StreamInterceptor)
 
+	unaryInterceptors = append(unaryInterceptors, grpc.ResourceNameTaggingUnaryServerInterceptor)
+
 	if options.Debug {
 		rpcOpts = append(rpcOpts, rpc.WithDebug())
 		unaryInterceptors = append(unaryInterceptors, func(

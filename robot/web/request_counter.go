@@ -399,7 +399,8 @@ func (rc *RequestCounter) UnaryInterceptor(
 		rc.setClientMetadataForPC(ctx, pc)
 	}
 
-	if resource := buildResourceLimitKey(req, apiMethod); resource != "" {
+	resourceName := apiMethod.getResourceName(req)
+	if resource := buildResourceLimitKey(resourceName, apiMethod); resource != "" {
 		if ok := rc.incrInFlight(resource, pc); !ok {
 			numInFlightRequestsForClient := rc.logRequestLimitExceeded(apiMethod.full, resource, pc)
 			return nil, &RequestLimitExceededError{
@@ -658,13 +659,13 @@ func buildRCKey(clientMsg any, method apiMethod) string {
 	return method.shortPath
 }
 
-func buildResourceLimitKey(clientMsg any, method apiMethod) string {
+func buildResourceLimitKey(resourceName string, method apiMethod) string {
 	if method.shortPath == "" {
-		// Ignore for nun-Viam APIs
+		// Ignore for non-Viam APIs
 		return ""
 	}
-	if name := method.getResourceName(clientMsg); name != "" {
-		return name + "." + method.service
+	if resourceName != "" {
+		return resourceName + "." + method.service
 	}
 	if method.service == "viam.robot.v1.RobotService" {
 		return method.service
