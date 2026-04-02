@@ -61,7 +61,7 @@ func TestMultipleModules(t *testing.T) {
 	}
 	test.That(t, success, test.ShouldBeTrue)
 
-	rc, err := connect(port, logger)
+	rc, err := connectWithDirectGRPC(port, logger)
 	test.That(t, err, test.ShouldBeNil)
 	defer func() {
 		test.That(t, rc.Close(context.Background()), test.ShouldBeNil)
@@ -198,26 +198,8 @@ func TestWebRTCSpans(t *testing.T) {
 	}
 	test.That(t, success, test.ShouldBeTrue)
 
-	connectCtx, cancelConn := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancelConn()
-	var rc robot.Robot
-	for {
-		dialCtx, dialCancel := context.WithTimeout(connectCtx, time.Millisecond*500)
-		var err error
-		rc, err = client.New(dialCtx, fmt.Sprintf("localhost:%d", port), logger,
-			client.WithDisableSessions(),
-		)
-		dialCancel()
-		if !errors.Is(err, context.DeadlineExceeded) {
-			test.That(t, err, test.ShouldBeNil)
-			break
-		}
-		select {
-		case <-connectCtx.Done():
-			t.Fatal(connectCtx.Err())
-		default:
-		}
-	}
+	rc, err := connect(port, logger)
+	test.That(t, err, test.ShouldBeNil)
 	defer func() {
 		test.That(t, rc.Close(context.Background()), test.ShouldBeNil)
 	}()
@@ -242,12 +224,20 @@ func TestWebRTCSpans(t *testing.T) {
 }
 
 func connect(port int, logger logging.Logger) (robot.Robot, error) {
+	return connectWithDialOpts(port, logger, rpc.WithDisableDirectGRPC())
+}
+
+func connectWithDirectGRPC(port int, logger logging.Logger) (robot.Robot, error) {
+	return connectWithDialOpts(port, logger, rpc.WithForceDirectGRPC())
+}
+
+func connectWithDialOpts(port int, logger logging.Logger, dialOpts ...rpc.DialOption) (robot.Robot, error) {
 	connectCtx, cancelConn := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancelConn()
 	for {
 		dialCtx, dialCancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 		rc, err := client.New(dialCtx, fmt.Sprintf("localhost:%d", port), logger,
-			client.WithDialOptions(rpc.WithForceDirectGRPC()),
+			client.WithDialOptions(dialOpts...),
 			client.WithDisableSessions(), // TODO(PRODUCT-343): add session support to modules
 		)
 		dialCancel()
