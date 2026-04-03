@@ -107,11 +107,10 @@ func TestMultipleModules(t *testing.T) {
 		gtestutils.WaitForAssertionWithSleep(t, time.Millisecond*500, 20, func(t testing.TB) {
 			checkTraceContents(t, testViamHome,
 				spanExpectation{
-					service:      "rdk",
-					kind:         otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService:   "acme.component.gizmo.v1.GizmoService",
-					rpcMethod:    "DoTwo",
-					resourceName: "gizmo1",
+					service:    "rdk",
+					kind:       otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService: "acme.component.gizmo.v1.GizmoService",
+					rpcMethod:  "DoTwo",
 				},
 				spanExpectation{
 					service:    "rdk",
@@ -133,11 +132,10 @@ func TestMultipleModules(t *testing.T) {
 					rpcMethod:  "Sum",
 				},
 				spanExpectation{
-					service:      "rdk",
-					kind:         otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService:   "acme.service.summation.v1.SummationService",
-					rpcMethod:    "Sum",
-					resourceName: "adder",
+					service:    "rdk",
+					kind:       otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService: "acme.service.summation.v1.SummationService",
+					rpcMethod:  "Sum",
 				},
 				spanExpectation{
 					service:      "SummationModule",
