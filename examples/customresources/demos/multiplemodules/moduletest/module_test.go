@@ -73,44 +73,20 @@ func TestMultipleModules(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 
 		giz := res.(gizmoapi.Gizmo)
-		ret1, err := giz.DoOne(context.Background(), "1.0")
+		retDoTwo, err := giz.DoTwo(context.Background(), true)
 		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret1, test.ShouldBeTrue)
-
-		// also tests that the ForeignServiceHandler does not drop the first message
-		ret2, err := giz.DoOneClientStream(context.Background(), []string{"1.0", "2.0", "3.0"})
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret2, test.ShouldBeFalse)
-
-		ret2, err = giz.DoOneClientStream(context.Background(), []string{"0", "2.0", "3.0"})
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret2, test.ShouldBeTrue)
-
-		ret3, err := giz.DoOneServerStream(context.Background(), "1.0")
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret3, test.ShouldResemble, []bool{true, false, true, false})
-
-		ret3, err = giz.DoOneBiDiStream(context.Background(), []string{"1.0", "2.0", "3.0"})
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret3, test.ShouldResemble, []bool{true, true, true})
-
-		ret4, err := giz.DoTwo(context.Background(), true)
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret4, test.ShouldEqual, "sum=4")
-
-		ret4, err = giz.DoTwo(context.Background(), false)
-		test.That(t, err, test.ShouldBeNil)
-		test.That(t, ret4, test.ShouldEqual, "sum=5")
+		test.That(t, retDoTwo, test.ShouldEqual, "sum=4")
 
 		// Test that spans from both modules are sent to viam-server and eventually
 		// exported to its traces file on disk.
 		gtestutils.WaitForAssertionWithSleep(t, time.Millisecond*500, 20, func(t testing.TB) {
 			checkTraceContents(t, testViamHome,
 				spanExpectation{
-					service:    "rdk",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.component.gizmo.v1.GizmoService",
-					rpcMethod:  "DoTwo",
+					service:      "rdk",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.component.gizmo.v1.GizmoService",
+					rpcMethod:    "DoTwo",
+					resourceName: "gizmo1",
 				},
 				spanExpectation{
 					service:    "rdk",
@@ -132,10 +108,11 @@ func TestMultipleModules(t *testing.T) {
 					rpcMethod:  "Sum",
 				},
 				spanExpectation{
-					service:    "rdk",
-					kind:       otlpv1.Span_SPAN_KIND_SERVER,
-					rpcService: "acme.service.summation.v1.SummationService",
-					rpcMethod:  "Sum",
+					service:      "rdk",
+					kind:         otlpv1.Span_SPAN_KIND_SERVER,
+					rpcService:   "acme.service.summation.v1.SummationService",
+					rpcMethod:    "Sum",
+					resourceName: "adder",
 				},
 				spanExpectation{
 					service:    "rdk",
@@ -152,6 +129,31 @@ func TestMultipleModules(t *testing.T) {
 				},
 			)
 		})
+
+		retDoTwo, err = giz.DoTwo(context.Background(), false)
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retDoTwo, test.ShouldEqual, "sum=5")
+
+		retDoOne, err := giz.DoOne(context.Background(), "1.0")
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retDoOne, test.ShouldBeTrue)
+
+		// also tests that the ForeignServiceHandler does not drop the first message
+		retClientStream, err := giz.DoOneClientStream(context.Background(), []string{"1.0", "2.0", "3.0"})
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retClientStream, test.ShouldBeFalse)
+
+		retClientStream, err = giz.DoOneClientStream(context.Background(), []string{"0", "2.0", "3.0"})
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retClientStream, test.ShouldBeTrue)
+
+		retServerStream, err := giz.DoOneServerStream(context.Background(), "1.0")
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retServerStream, test.ShouldResemble, []bool{true, false, true, false})
+
+		retBiDiStream, err := giz.DoOneBiDiStream(context.Background(), []string{"1.0", "2.0", "3.0"})
+		test.That(t, err, test.ShouldBeNil)
+		test.That(t, retBiDiStream, test.ShouldResemble, []bool{true, true, true})
 	})
 
 	// Summation is a custom service model and API.
