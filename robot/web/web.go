@@ -718,6 +718,9 @@ func (svc *webService) initAuthHandlers(listenerTCPAddr *net.TCPAddr, options we
 			}
 		}
 
+		if options.Secure && len(options.Auth.TLSAuthEntities) != 0 {
+			rpcOpts = append(rpcOpts, rpc.WithTLSAuthHandler(options.Auth.TLSAuthEntities))
+		}
 		for _, handler := range options.Auth.Handlers {
 			switch handler.Type {
 			case rpc.CredentialsTypeAPIKey:
@@ -746,9 +749,6 @@ func (svc *webService) initAuthHandlers(listenerTCPAddr *net.TCPAddr, options we
 			default:
 				return nil, errors.Errorf("do not know how to handle auth for %q", handler.Type)
 			}
-		}
-		if options.Secure && len(options.Auth.TLSAuthEntities) != 0 {
-			rpcOpts = append(rpcOpts, rpc.WithTLSAuthHandler(options.Auth.TLSAuthEntities))
 		}
 	}
 
