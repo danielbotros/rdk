@@ -2,8 +2,6 @@
 package weboptions
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -119,15 +117,6 @@ func FromConfig(cfg *config.Config) (Options, error) {
 					return Options{}, errors.New("switching from local config to cloud config not currently supported")
 				}
 				options.Network.TLSConfig = cfg.Network.TLSConfig
-				cert, err := cfg.Network.TLSConfig.GetCertificate(&tls.ClientHelloInfo{})
-				if err != nil {
-					return Options{}, err
-				}
-				leaf, err := x509.ParseCertificate(cert.Certificate[0])
-				if err != nil {
-					return Options{}, err
-				}
-				options.Auth.TLSAuthEntities = leaf.DNSNames
 			}
 		}
 
