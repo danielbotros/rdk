@@ -3,6 +3,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.viam.com/utils"
 	"go.viam.com/utils/artifact"
 	"go.viam.com/utils/jwks"
 	"go.viam.com/utils/pexec"
@@ -1071,13 +1073,17 @@ func appendIntermediateCerts(cert *tls.Certificate, logger logging.Logger) {
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	for _, aiaURL := range leaf.IssuingCertificateURL {
-		resp, err := client.Get(aiaURL) //nolint:gosec
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, aiaURL, nil)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req) //nolint:gosec
 		if err != nil {
 			logger.Debugw("failed to fetch intermediate cert", "url", aiaURL, "error", err)
 			continue
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		utils.UncheckedError(resp.Body.Close())
 		if err != nil {
 			logger.Debugw("failed to read intermediate cert", "url", aiaURL, "error", err)
 			continue
