@@ -117,7 +117,7 @@ func FromConfig(cfg *config.Config) (Options, error) {
 			}
 
 			// This will only happen if we're switching from a local config to a cloud config.
-			if cfg.Network.TLSConfig == nil {
+			if cfg.Network.TLSConfig == nil && !cfg.Network.NoTLS {
 				return Options{}, errors.New("switching from local config to cloud config not currently supported")
 			}
 			cert, err := cfg.Network.TLSConfig.GetCertificate(&tls.ClientHelloInfo{})
