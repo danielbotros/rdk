@@ -4,9 +4,13 @@ package config
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1053,16 +1057,53 @@ func ParseAPIKeys(handler AuthHandlerConfig) map[string]string {
 	return apiKeys
 }
 
+// appendIntermediateCerts fetches any missing intermediate certificates by following
+// the AIA (Authority Information Access) URLs in the leaf certificate and appends
+// their DER-encoded bytes to cert.Certificate. This ensures clients that do not
+// perform AIA fetching (e.g. Linux) can verify the chain without needing the
+// intermediates in their system trust store.
+func appendIntermediateCerts(cert *tls.Certificate) error {
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
+	}
+	for _, url := range leaf.IssuingCertificateURL {
+		//nolint:noctx
+		resp, err := http.Get(url) //nolint:gosec
+		if err != nil {
+			return errors.Wrapf(err, "fetching intermediate cert from %s", url)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return errors.Wrapf(err, "reading intermediate cert from %s", url)
+		}
+		// The response may be DER or PEM encoded.
+		if block, _ := pem.Decode(body); block != nil {
+			body = block.Bytes
+		}
+		if _, err := x509.ParseCertificate(body); err != nil {
+			return errors.Wrapf(err, "parsing intermediate cert from %s", url)
+		}
+		cert.Certificate = append(cert.Certificate, body)
+	}
+	return nil
+}
+
 // CreateTLSWithCert creates a tls.Config with the TLS certificate to be returned.
+// It fetches any intermediate certificates via AIA so that clients without those
+// intermediates in their system trust store (e.g. Linux) can verify the chain.
 func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair([]byte(cfg.Cloud.TLSCertificate), []byte(cfg.Cloud.TLSPrivateKey))
 	if err != nil {
 		return nil, err
 	}
+	if err := appendIntermediateCerts(&cert); err != nil {
+		return nil, err
+	}
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			// always return same cert
 			return &cert, nil
 		},
 	}, nil
