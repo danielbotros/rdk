@@ -3,15 +3,10 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,7 +16,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.viam.com/utils"
 	"go.viam.com/utils/artifact"
 	"go.viam.com/utils/jwks"
 	"go.viam.com/utils/pexec"
@@ -1059,146 +1053,16 @@ func ParseAPIKeys(handler AuthHandlerConfig) map[string]string {
 	return apiKeys
 }
 
-// appendIntermediateCerts fetches any missing intermediate certificates by following
-// the AIA (Authority Information Access) URLs in the leaf certificate and appends
-// their DER-encoded bytes to cert.Certificate. This ensures clients that do not
-// perform AIA fetching (e.g. Linux) can verify the chain without needing the
-// intermediates in their system trust store.
-func appendIntermediateCerts(cert *tls.Certificate, logger logging.Logger) {
-	leaf, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		logger.Debugw("failed to parse leaf certificate; skipping intermediate fetch", "error", err)
-		return
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	for _, aiaURL := range leaf.IssuingCertificateURL {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, aiaURL, nil)
-		if err != nil {
-			continue
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			logger.Debugw("failed to fetch intermediate cert", "url", aiaURL, "error", err)
-			continue
-		}
-		body, err := io.ReadAll(resp.Body)
-		utils.UncheckedError(resp.Body.Close())
-		if err != nil {
-			logger.Debugw("failed to read intermediate cert", "url", aiaURL, "error", err)
-			continue
-		}
-		if block, _ := pem.Decode(body); block != nil {
-			body = block.Bytes
-		}
-		if _, err := x509.ParseCertificate(body); err != nil {
-			logger.Debugw("failed to parse intermediate cert", "url", aiaURL, "error", err)
-			continue
-		}
-		cert.Certificate = append(cert.Certificate, body)
-	}
-}
-
-// tlsIntermediateCache is the on-disk structure for caching intermediate TLS certificates.
-// Intermediates are stored as raw DER bytes; encoding/json marshals []byte as base64.
-type tlsIntermediateCache struct {
-	LeafCertPEM   string   `json:"leaf_cert_pem"`
-	Intermediates [][]byte `json:"intermediates"`
-}
-
-func getTLSCacheFilePath(partID string) string {
-	return filepath.Join(rutils.ViamDotDir, fmt.Sprintf("cached_tls_intermediates_%s.json", partID))
-}
-
-func readTLSIntermediateCache(path string) (*tlsIntermediateCache, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer utils.UncheckedErrorFunc(f.Close)
-	var c tlsIntermediateCache
-	if err := json.NewDecoder(f).Decode(&c); err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
-func writeTLSIntermediateCache(path string, c *tlsIntermediateCache, partID string) error {
-	if err := os.MkdirAll(rutils.ViamDotDir, 0o700); err != nil {
-		return err
-	}
-	data, err := json.Marshal(c)
-	if err != nil {
-		return err
-	}
-	return artifact.AtomicStore(path, bytes.NewReader(data), partID)
-}
-
-// loadOrFetchIntermediateCerts appends intermediate certificates to cert, using a disk
-// cache keyed by leafCertPEM to avoid redundant AIA HTTP fetches. If the leaf cert PEM
-// matches the cache, cached intermediates are used and no network request is made. If
-// the leaf has rotated or no cache exists, intermediates are fetched via AIA and the
-// cache is updated. partID is used to name the cache file; if empty, caching is skipped.
-func loadOrFetchIntermediateCerts(cert *tls.Certificate, leafCertPEM, partID string, logger logging.Logger) {
-	if partID == "" {
-		appendIntermediateCerts(cert, logger)
-		return
-	}
-
-	cachePath := getTLSCacheFilePath(partID)
-
-	cached, err := readTLSIntermediateCache(cachePath)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		logger.Debugw("no TLS intermediate cache found; fetching from AIA")
-	case err != nil:
-		logger.Warnw("error reading TLS intermediate cache; fetching from AIA", "error", err)
-	case cached.LeafCertPEM == leafCertPEM:
-		logger.Debugw("TLS intermediate cache hit; skipping AIA fetch")
-		beforeCache := len(cert.Certificate)
-		for _, der := range cached.Intermediates {
-			if _, err := x509.ParseCertificate(der); err != nil {
-				logger.Warnw("cached intermediate cert is invalid; re-fetching from AIA", "error", err)
-				cert.Certificate = cert.Certificate[:beforeCache]
-				goto fetch
-			}
-			cert.Certificate = append(cert.Certificate, der)
-		}
-		return
-	default:
-		logger.Debugw("leaf cert rotated; re-fetching intermediates from AIA")
-	}
-
-fetch:
-	before := len(cert.Certificate)
-	appendIntermediateCerts(cert, logger)
-	fetched := cert.Certificate[before:]
-
-	if len(fetched) == 0 {
-		return
-	}
-
-	newCache := tlsIntermediateCache{
-		LeafCertPEM:   leafCertPEM,
-		Intermediates: make([][]byte, len(fetched)),
-	}
-	copy(newCache.Intermediates, fetched)
-
-	if err := writeTLSIntermediateCache(cachePath, &newCache, partID); err != nil {
-		logger.Warnw("failed to write TLS intermediate cache", "error", err)
-	}
-}
-
 // CreateTLSWithCert creates a tls.Config with the TLS certificate to be returned.
 func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair([]byte(cfg.Cloud.TLSCertificate), []byte(cfg.Cloud.TLSPrivateKey))
 	if err != nil {
 		return nil, err
 	}
-	loadOrFetchIntermediateCerts(&cert, cfg.Cloud.TLSCertificate, cfg.Cloud.ID, logging.NewLogger("tls"))
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			// always return same cert
 			return &cert, nil
 		},
 	}, nil
