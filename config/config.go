@@ -1094,8 +1094,6 @@ func appendIntermediateCerts(cert *tls.Certificate, logger logging.Logger) {
 }
 
 // CreateTLSWithCert creates a tls.Config with the TLS certificate to be returned.
-// It fetches any intermediate certificates via AIA so that clients without those
-// intermediates in their system trust store (e.g. Linux) can verify the chain.
 func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair([]byte(cfg.Cloud.TLSCertificate), []byte(cfg.Cloud.TLSPrivateKey))
 	if err != nil {
