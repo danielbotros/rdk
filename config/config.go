@@ -1077,7 +1077,7 @@ func appendIntermediateCerts(cert *tls.Certificate, logger logging.Logger) {
 		if err != nil {
 			continue
 		}
-		resp, err := client.Do(req) //nolint:gosec
+		resp, err := client.Do(req) 
 		if err != nil {
 			logger.Debugw("failed to fetch intermediate cert", "url", aiaURL, "error", err)
 			continue
