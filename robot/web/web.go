@@ -747,6 +747,9 @@ func (svc *webService) initAuthHandlers(listenerTCPAddr *net.TCPAddr, options we
 				return nil, errors.Errorf("do not know how to handle auth for %q", handler.Type)
 			}
 		}
+		if options.Secure && len(options.Auth.TLSAuthEntities) != 0 {
+			rpcOpts = append(rpcOpts, rpc.WithTLSAuthHandler(options.Auth.TLSAuthEntities))
+		}
 	}
 
 	if options.Auth.ExternalAuthConfig != nil {
