@@ -1062,32 +1062,35 @@ func ParseAPIKeys(handler AuthHandlerConfig) map[string]string {
 // their DER-encoded bytes to cert.Certificate. This ensures clients that do not
 // perform AIA fetching (e.g. Linux) can verify the chain without needing the
 // intermediates in their system trust store.
-func appendIntermediateCerts(cert *tls.Certificate) error {
+func appendIntermediateCerts(cert *tls.Certificate, logger logging.Logger) {
 	leaf, err := x509.ParseCertificate(cert.Certificate[0])
 	if err != nil {
-		return err
+		logger.Debugw("failed to parse leaf certificate; skipping intermediate fetch", "error", err)
+		return
 	}
-	for _, url := range leaf.IssuingCertificateURL {
-		//nolint:noctx
-		resp, err := http.Get(url) //nolint:gosec
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	for _, aiaURL := range leaf.IssuingCertificateURL {
+		resp, err := client.Get(aiaURL) //nolint:gosec
 		if err != nil {
-			return errors.Wrapf(err, "fetching intermediate cert from %s", url)
+			logger.Debugw("failed to fetch intermediate cert", "url", aiaURL, "error", err)
+			continue
 		}
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return errors.Wrapf(err, "reading intermediate cert from %s", url)
+			logger.Debugw("failed to read intermediate cert", "url", aiaURL, "error", err)
+			continue
 		}
-		// The response may be DER or PEM encoded.
 		if block, _ := pem.Decode(body); block != nil {
 			body = block.Bytes
 		}
 		if _, err := x509.ParseCertificate(body); err != nil {
-			return errors.Wrapf(err, "parsing intermediate cert from %s", url)
+			logger.Debugw("failed to parse intermediate cert", "url", aiaURL, "error", err)
+			continue
 		}
 		cert.Certificate = append(cert.Certificate, body)
 	}
-	return nil
 }
 
 // CreateTLSWithCert creates a tls.Config with the TLS certificate to be returned.
@@ -1098,9 +1101,7 @@ func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := appendIntermediateCerts(&cert); err != nil {
-		return nil, err
-	}
+	appendIntermediateCerts(&cert, logging.NewLogger("tls"))
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
