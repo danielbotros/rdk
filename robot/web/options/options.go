@@ -97,9 +97,6 @@ func FromConfig(cfg *config.Config) (Options, error) {
 		options.SignalingAddress = cfg.Cloud.SignalingAddress
 
 		if cfg.Cloud.TLSCertificate != "" {
-			// override
-			options.Network.TLSConfig = cfg.Network.TLSConfig
-
 			// NOTE(RDK-148):
 			// when we are managed and no explicit bind address is set,
 			// we will listen everywhere on 8080. We assume this to be
