@@ -1207,7 +1207,7 @@ func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 // ProcessConfig processes robot configs.
 func ProcessConfig(in *Config) (*Config, error) {
 	out := *in
-	if in.Cloud != nil && !in.Network.NoTLS {
+	if in.Cloud != nil {
 		// We expect a cloud config from app to always contain a non-empty `TLSCertificate` field.
 		// We do this empty string check just to cope with unexpected input, such as cached configs
 		// that are hand altered to have their `TLSCertificate` removed.
