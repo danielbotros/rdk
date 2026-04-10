@@ -1356,7 +1356,7 @@ func RobotFromConfig(
 	logger logging.Logger,
 	opts ...Option,
 ) (robot.LocalRobot, error) {
-	processedCfg, err := config.ProcessConfig(cfg)
+	processedCfg, err := config.ProcessConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

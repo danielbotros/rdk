@@ -3,6 +3,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -1054,12 +1055,12 @@ func ParseAPIKeys(handler AuthHandlerConfig) map[string]string {
 }
 
 // CreateTLSWithCert creates a tls.Config with the TLS certificate to be returned.
-func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
+func CreateTLSWithCert(ctx context.Context, cfg *Config) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair([]byte(cfg.Cloud.TLSCertificate), []byte(cfg.Cloud.TLSPrivateKey))
 	if err != nil {
 		return nil, err
 	}
-	loadOrFetchIntermediateCerts(&cert, cfg.Cloud.TLSCertificate, cfg.Cloud.ID, logging.NewLogger("tls"))
+	loadOrFetchIntermediateCerts(ctx, &cert, cfg.Cloud.TLSCertificate, cfg.Cloud.ID, logging.NewLogger("tls"))
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -1069,14 +1070,14 @@ func CreateTLSWithCert(cfg *Config) (*tls.Config, error) {
 }
 
 // ProcessConfig processes robot configs.
-func ProcessConfig(in *Config) (*Config, error) {
+func ProcessConfig(ctx context.Context, in *Config) (*Config, error) {
 	out := *in
 	if in.Cloud != nil {
 		// We expect a cloud config from app to always contain a non-empty `TLSCertificate` field.
 		// We do this empty string check just to cope with unexpected input, such as cached configs
 		// that are hand altered to have their `TLSCertificate` removed.
 		if in.Cloud.TLSCertificate != "" {
-			tlsConfig, err := CreateTLSWithCert(in)
+			tlsConfig, err := CreateTLSWithCert(ctx, in)
 			if err != nil {
 				return nil, err
 			}

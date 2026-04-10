@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -92,7 +93,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, os.WriteFile(getTLSCacheFilePath(partID), data, 0o640), test.ShouldBeNil)
 
-		loadOrFetchIntermediateCerts(&cert, leafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &cert, leafPEM, partID, logging.NewTestLogger(t))
 
 		// Leaf + cached intermediate should be present.
 		test.That(t, len(cert.Certificate), test.ShouldEqual, 2)
@@ -109,7 +110,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		cert, leafPEM := makeSelfSignedCert(t, nil)
 		partID := "test-part"
 
-		loadOrFetchIntermediateCerts(&cert, leafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &cert, leafPEM, partID, logging.NewTestLogger(t))
 
 		// Only the leaf should be present; no cache file written.
 		test.That(t, len(cert.Certificate), test.ShouldEqual, 1)
@@ -134,7 +135,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		cert, leafPEM := makeSelfSignedCert(t, []string{server.URL})
 		partID := "test-part"
 
-		loadOrFetchIntermediateCerts(&cert, leafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &cert, leafPEM, partID, logging.NewTestLogger(t))
 
 		// Intermediate should be appended.
 		test.That(t, len(cert.Certificate), test.ShouldEqual, 2)
@@ -170,7 +171,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		// New cert with no AIA URLs — fetch will return nothing.
 		newCert, newLeafPEM := makeSelfSignedCert(t, nil)
 
-		loadOrFetchIntermediateCerts(&newCert, newLeafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &newCert, newLeafPEM, partID, logging.NewTestLogger(t))
 
 		// Old cached intermediate should NOT be used; fetch returned nothing so only leaf.
 		test.That(t, len(newCert.Certificate), test.ShouldEqual, 1)
@@ -186,7 +187,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		test.That(t, os.WriteFile(getTLSCacheFilePath(partID), []byte("not json"), 0o640), test.ShouldBeNil)
 
 		cert, leafPEM := makeSelfSignedCert(t, nil)
-		loadOrFetchIntermediateCerts(&cert, leafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &cert, leafPEM, partID, logging.NewTestLogger(t))
 
 		// Falls back to fetch (returns nothing due to no AIA); only leaf present.
 		test.That(t, len(cert.Certificate), test.ShouldEqual, 1)
@@ -219,7 +220,7 @@ func TestLoadOrFetchIntermediateCerts(t *testing.T) {
 		test.That(t, err, test.ShouldBeNil)
 		test.That(t, os.WriteFile(getTLSCacheFilePath(partID), data, 0o640), test.ShouldBeNil)
 
-		loadOrFetchIntermediateCerts(&cert, leafPEM, partID, logging.NewTestLogger(t))
+		loadOrFetchIntermediateCerts(context.Background(), &cert, leafPEM, partID, logging.NewTestLogger(t))
 
 		// Corrupt DER triggers re-fetch from AIA; fresh intermediate should be present.
 		test.That(t, len(cert.Certificate), test.ShouldEqual, 2)

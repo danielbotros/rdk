@@ -57,7 +57,7 @@ func writeIntermediateTLSCertCache(path string, c *intermediateTLSCertCache) err
 // (Authority Information Access) URLs in the leaf certificate, returning their
 // DER-encoded bytes. This ensures clients that do not perform AIA fetching
 // can verify the chain without needing the intermediates in their system trust store.
-func fetchIntermediateCerts(cert *tls.Certificate, logger logging.Logger) [][]byte {
+func fetchIntermediateCerts(ctx context.Context, cert *tls.Certificate, logger logging.Logger) [][]byte {
 	leaf, err := x509.ParseCertificate(cert.Certificate[0])
 	if err != nil {
 		logger.Debugw("failed to parse leaf certificate; skipping intermediate fetch", "error", err)
@@ -67,7 +67,7 @@ func fetchIntermediateCerts(cert *tls.Certificate, logger logging.Logger) [][]by
 	var intermediates [][]byte
 	client := &http.Client{Timeout: 10 * time.Second}
 	for _, aiaURL := range leaf.IssuingCertificateURL {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, aiaURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, aiaURL, nil)
 		if err != nil {
 			continue
 		}
@@ -99,9 +99,9 @@ func fetchIntermediateCerts(cert *tls.Certificate, logger logging.Logger) [][]by
 // matches the cache, cached intermediates are used and no network request is made. If
 // the leaf has rotated or no cache exists, intermediates are fetched via AIA and the
 // cache is updated. partID is used to name the cache file; if empty, caching is skipped.
-func loadOrFetchIntermediateCerts(cert *tls.Certificate, leafCertPEM, partID string, logger logging.Logger) {
+func loadOrFetchIntermediateCerts(ctx context.Context, cert *tls.Certificate, leafCertPEM, partID string, logger logging.Logger) {
 	if partID == "" {
-		cert.Certificate = append(cert.Certificate, fetchIntermediateCerts(cert, logger)...)
+		cert.Certificate = append(cert.Certificate, fetchIntermediateCerts(ctx, cert, logger)...)
 		return
 	}
 
@@ -133,7 +133,7 @@ func loadOrFetchIntermediateCerts(cert *tls.Certificate, leafCertPEM, partID str
 		logger.Debugw("leaf cert rotated; re-fetching intermediates from AIA")
 	}
 
-	fetched := fetchIntermediateCerts(cert, logger)
+	fetched := fetchIntermediateCerts(ctx, cert, logger)
 	if len(fetched) == 0 {
 		return
 	}

@@ -339,8 +339,8 @@ func (s *robotServer) createWebOptions(cfg *config.Config) (weboptions.Options, 
 
 // A wrapper around actual config processing that also applies options from the
 // robot server.
-func (s *robotServer) processConfig(in *config.Config) (*config.Config, error) {
-	out, err := config.ProcessConfig(in)
+func (s *robotServer) processConfig(ctx context.Context, in *config.Config) (*config.Config, error) {
+	out, err := config.ProcessConfig(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func (s *robotServer) configWatcher(ctx context.Context, currCfg *config.Config,
 		case <-ctx.Done():
 			return
 		case cfg := <-watcher.Config():
-			processedConfig, err := s.processConfig(cfg)
+			processedConfig, err := s.processConfig(ctx, cfg)
 			if err != nil {
 				s.configLogger.Errorw("reconfiguration aborted: error processing config", "error", err)
 				continue
@@ -549,7 +549,7 @@ func (s *robotServer) serveWeb(ctx context.Context, cfg *config.Config) (err err
 		<-slowWatcher
 	}()
 	s.configLogger.CInfo(ctx, "Processing initial robot config...")
-	fullProcessedConfig, err := s.processConfig(cfg)
+	fullProcessedConfig, err := s.processConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}

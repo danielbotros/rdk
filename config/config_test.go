@@ -794,7 +794,7 @@ ph2C/7IgjA==
 		cert, err := tls.X509KeyPair([]byte(cfg.Cloud.TLSCertificate), []byte(cfg.Cloud.TLSPrivateKey))
 		test.That(t, err, test.ShouldBeNil)
 
-		tlsCfg, err := config.CreateTLSWithCert(cfg)
+		tlsCfg, err := config.CreateTLSWithCert(context.Background(), cfg)
 		test.That(t, err, test.ShouldBeNil)
 
 		observed, err := tlsCfg.GetCertificate(&tls.ClientHelloInfo{})
@@ -803,7 +803,7 @@ ph2C/7IgjA==
 	})
 	t.Run("cert error", func(t *testing.T) {
 		cfg := &config.Config{Cloud: &config.Cloud{TLSCertificate: "abcd", TLSPrivateKey: "abcd"}}
-		_, err := config.CreateTLSWithCert(cfg)
+		_, err := config.CreateTLSWithCert(context.Background(), cfg)
 		test.That(t, err, test.ShouldBeError, errors.New("tls: failed to find any PEM data in certificate input"))
 	})
 }
@@ -865,7 +865,7 @@ ph2C/7IgjA==
 	expectedRemoteNoCloud := remote
 	expectedRemoteDiffManagerNoCloud := remoteDiffManager
 
-	tlsCfg, err := config.CreateTLSWithCert(cloudWTLSCfg)
+	tlsCfg, err := config.CreateTLSWithCert(context.Background(), cloudWTLSCfg)
 	test.That(t, err, test.ShouldBeNil)
 
 	expectedCloudWTLSCfg := &config.Config{Cloud: cloudWTLS, Remotes: []config.Remote{}}
@@ -895,7 +895,7 @@ ph2C/7IgjA==
 		{TestName: "remotes cloud and cert", Config: remotesCloudWTLSCfg, Expected: expectedRemotesCloudWTLSCfg},
 	} {
 		t.Run(tc.TestName, func(t *testing.T) {
-			observed, err := config.ProcessConfig(tc.Config)
+			observed, err := config.ProcessConfig(context.Background(), tc.Config)
 			test.That(t, err, test.ShouldBeNil)
 			// TLSConfig holds funcs, which do not resemble each other so check separately and nil them out after.
 			if tc.Expected.Network.TLSConfig != nil {
@@ -914,7 +914,7 @@ ph2C/7IgjA==
 
 	t.Run("cert error", func(t *testing.T) {
 		cfg := &config.Config{Cloud: &config.Cloud{TLSCertificate: "abcd", TLSPrivateKey: "abcd"}}
-		_, err := config.ProcessConfig(cfg)
+		_, err := config.ProcessConfig(context.Background(), cfg)
 		test.That(t, err, test.ShouldBeError, errors.New("tls: failed to find any PEM data in certificate input"))
 	})
 }
